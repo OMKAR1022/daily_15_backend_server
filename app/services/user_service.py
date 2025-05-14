@@ -1,5 +1,5 @@
 from datetime import datetime, timedelta
-from typing import Optional
+from typing import Optional, Dict, Any
 from jose import JWTError, jwt
 from passlib.context import CryptContext
 from sqlalchemy.orm import Session
@@ -77,25 +77,44 @@ def update_user(db: Session, user_id: int, user: UserUpdate) -> Optional[User]:
     db.refresh(db_user)
     return db_user
 
-async def sign_up(user_data: UserCreate) -> dict:
+async def sign_up(user_data: UserCreate) -> Dict[str, Any]:
     try:
+        # Create user in auth.users via Supabase Auth
         response = supabase.auth.sign_up({
             "email": user_data.email,
             "password": user_data.password,
             "options": {
                 "data": {
-                    "full_name": user_data.full_name
+                    "full_name": user_data.full_name,
+                    "exam_type": user_data.exam_type
                 }
             }
         })
-        return response
+
+        # Insert into users table
+        supabase.table("users").insert({
+            "user_id": response.user.id,
+            "full_name": user_data.full_name,
+            "email": user_data.email,
+            "exam_type": user_data.exam_type
+        }).execute()
+
+        # Initialize streak for the user
+        supabase.table("streaks").insert({
+            "user_id": response.user.id
+        }).execute()
+
+        return {
+            "message": "User registered successfully",
+            "user": response.user
+        }
     except Exception as e:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail=str(e)
         )
 
-async def sign_in(email: str, password: str) -> dict:
+async def sign_in(email: str, password: str) -> Dict[str, Any]:
     try:
         response = supabase.auth.sign_in_with_password({
             "email": email,
@@ -108,7 +127,7 @@ async def sign_in(email: str, password: str) -> dict:
             detail="Invalid credentials"
         )
 
-async def get_user(token: str) -> dict:
+async def get_user(token: str) -> Dict[str, Any]:
     try:
         user = supabase.auth.get_user(token)
         return user
@@ -118,7 +137,7 @@ async def get_user(token: str) -> dict:
             detail="Invalid token"
         )
 
-async def sign_out(token: str) -> dict:
+async def sign_out(token: str) -> Dict[str, Any]:
     try:
         response = supabase.auth.sign_out()
         return response

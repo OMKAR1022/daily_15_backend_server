@@ -3,6 +3,7 @@ from fastapi.security import OAuth2PasswordBearer
 from app.services.user_service import sign_up, sign_in, get_user, sign_out
 from app.schemas.user import UserCreate, Token
 from pydantic import BaseModel
+from typing import Dict, Any
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="token")
@@ -11,13 +12,9 @@ class LoginRequest(BaseModel):
     email: str
     password: str
 
-@router.post("/register", response_model=Token)
+@router.post("/register", response_model=Dict[str, Any])
 async def register(user_data: UserCreate):
-    response = await sign_up(user_data)
-    return {
-        "access_token": response.session.access_token,
-        "token_type": "bearer"
-    }
+    return await sign_up(user_data)
 
 @router.post("/login", response_model=Token)
 async def login(login_data: LoginRequest):
